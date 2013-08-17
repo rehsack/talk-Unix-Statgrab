@@ -1,0 +1,848 @@
+\documentclass[ngerman,xcolor={table,dvipsnames},smaller,compress,hyperref={bookmarks,colorlinks}]{beamer}
+
+\usepackage{url}
+\usepackage{listings}
+\usepackage[latin9]{inputenc}
+\usepackage{xcolor,textcomp}
+%\usepackage{auto-pst-pdf}
+\usepackage{pstricks}
+\usepackage{pst-node}
+\usepackage{pst-uml}
+\usepackage{tabularx,threeparttable}
+\usepackage{hyperref}
+
+\title{Unix::Statgrab - System Monitoring}
+\author{Jens Rehsack}
+\date{2013}
+
+\usetheme[secheader]{Boadilla}
+\setbeamertemplate{navigation symbols}{}
+
+\newcommand{\perlfilename}[1]{{\color{cyan}{\textit{\begingroup \urlstyle{sf}\Url{#1}}}}}
+\newcommand{\xsfilename}[1]{{\color{olive}{\textit{\begingroup \urlstyle{sf}\Url{#1}}}}}
+\newcommand{\hfilename}[1]{{\color{olive}{\textit{\begingroup \urlstyle{sf}\Url{#1}}}}}
+\newcommand{\cfilename}[1]{{\color{magenta}{\textit{\begingroup \urlstyle{sf}\Url{#1}}}}}
+
+\makeatletter
+\makeatother
+
+%\newcommand{\mypart}[1]{\part{#1}\frame{\partpage \tableofcontents}}
+\newcommand{\mysection}[1]{\section{#1}\frame{\frametitle{Overview}\tableofcontents[sectionstyle=show/shaded,subsectionstyle=show/shaded/shaded]}}
+\newcommand{\mysubsection}[1]{\subsection{#1}\frame{\frametitle{Overview}\tableofcontents[sectionstyle=show/shaded,subsectionstyle=show/shaded/shaded]}}
+\newcommand{\mysubsubsection}[1]{\subsubsection{#1}\frame{\frametitle{Overview}\tableofcontents[sectionstyle=show/shaded,subsectionstyle=show/shaded/shaded]}}
+
+\begin{document}
+
+\psset{angleA=90,angleB=-90}
+\lstset{language=Perl,
+        basicstyle=\ttfamily,
+        keywordstyle=\color{Maroon},
+        commentstyle=\color{Blue}, 
+        stringstyle=\color{Green},
+        showstringspaces=false}
+
+%\AtBeginSection[]{\begin{frame}<beamer> \frametitle{Overview} \tableofcontents[current, currentsubsection] \end{frame}}
+%\AtBeginSubsection[]{\begin{frame}<beamer> \frametitle{Overview} \tableofcontents[current, currentsubsection] \end{frame}}
+\AtBeginPart{\begin{frame}<beamer> \frametitle{Overview} \partpage \tableofcontents[current] \end{frame}}
+
+\frame{\maketitle}
+
+\part{Introduction}
+
+\section{Introduction}
+
+\begin{frame}[fragile]
+\frametitle{Audience}
+\begin{block}<1->{Audience}
+\begin{itemize}
+\item Developer who wants to create or improve monitoring software
+\item Developer who wants to evaluate system stats for content sensitive
+      code paths
+\item Developer who wants to to learn the difference to earlier libstatgrab
+      / Unix::Statgrab API
+\item Developers or Operators (Admins) who wants to learn about measurement
+      of statistic values of the machine
+\end{itemize}
+\end{block}
+
+\begin{block}<2->{Prerequisites of the Audience}
+Following knowledge is expected:
+\begin{itemize}
+\item advanced skills in at least one object oriented and procedural programming language
+\item more than one year practical experience in object oriented development
+\item Experience with Unix or compatible operating systems
+\item slightly above basic Perl experience
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Motivation}
+
+\begin{block}<1->{XS / C}
+\begin{itemize}
+\item use of native API to get OS stats
+\item performance advantage
+\item interoperability (most VM's have a * native interface)
+\item portability - widest calling convention support in C
+\end{itemize}
+\end{block}
+
+\end{frame}
+
+\part{libstatgrab}
+
+\section{Host Information}
+
+\begin{frame}[fragile]
+\frametitle{Host Info}
+\begin{columns}[t]
+\begin{column}{.5\textwidth}
+\begin{block}<1->{sg\_host\_info}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    char *os_name(*@\pnode(0,0){A}{}@*);
+    char *os_release(*@\pnode(0,0){B}{}@*);
+    char *os_version(*@\pnode(0,0){C}{}@*);
+    char *platform(*@\pnode(0,0){D}{}@*);
+    char *hostname(*@\pnode(0,0){E}{}@*);
+    unsigned bitwidth(*@\pnode(0,0){F}{}@*);
+    sg_host_state host_state(*@\pnode(0,0){G}{}@*);
+    unsigned ncpus(*@\pnode(0,0){H}{}@*);
+    unsigned maxcpus(*@\pnode(0,0){I}{}@*);
+    time_t uptime(*@\pnode(0,0){J}{}@*);
+    time_t systime(*@\pnode(0,0){K}{}@*);
+} sg_host_info;
+\end{lstlisting}
+\end{block}
+\end{column}
+
+\begin{column}{.5\textwidth}
+\scriptsize
+\uncover<2->{bundles some operating system information as}
+\begin{itemize}
+\onslide<2->{\item \rnode{a}{name} (Linux, FreeBSD, AIX),
+             \uncover<3->{\item \rnode{b}{release} (eg. kernel version),}
+             \uncover<4->{\item \rnode{c}{entire} OS version string (eg. Darwin Kernel Version 12.4.0: Wed May  1 17:57:12 PDT 2013; root:xnu-2050.24.15~1/RELEASE\_X86\_64),}
+             \uncover<5->{\item \rnode{d}{platform}, what finally means CPU information from OS perspective,}
+             \uncover<6->{\item \rnode{e}{hostname} name of the host.}
+             \uncover<7->{\item \rnode{f}{bitwidth} (usually 32 or 64),}
+             \uncover<8->{\item \rnode{g}{host state} - one of \texttt{sg\_physical\_host},
+			  \texttt{sg\_virtual\_machine}, \texttt{sg\_paravirtual\_machine},
+			  \texttt{sg\_hardware\_virtualized} or
+			  \texttt{sg\_unknown\_configuration}),}
+             \uncover<9->{\item \rnode{h}{current} number of CPU's,}
+             \uncover<10->{\item \rnode{i}{maximum} number of CPU's.}
+             \uncover<11->{\item \rnode{k}{timestamp} when collected this stats.}
+
+             \uncover<2-6>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<3-6>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<4-6>{\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<5-6>{\nccurve[linecolor=olive]{->}{d}{D}}
+             \uncover<6-6>{\nccurve[linecolor=olive]{->}{e}{E}}
+             \uncover<7-8>{\nccurve[linecolor=olive]{->}{f}{F}}
+             \uncover<8-8>{\nccurve[linecolor=olive]{->}{g}{G}}
+             \uncover<9-10>{\nccurve[linecolor=olive]{->}{h}{H}}
+             \uncover<10-10>{\nccurve[linecolor=olive]{->}{i}{I}}
+             \uncover<11-11>{\nccurve[linecolor=olive]{->}{k}{K}}
+}
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+\section{CPU statistics}
+
+\begin{frame}[fragile]
+\frametitle{CPU stats}
+\begin{block}<1->{sg\_cpu\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    unsigned long long user, kernel, idle, iowait, swap, nice, total(*@\pnode(0,0){A}{}@*);
+
+    unsigned long long context_switches, voluntary_context_switches, involuntary_context_switches,(*@\pnode(0,0){B}{}@*)
+                       syscalls, interrupts, soft_interrupts,(*@\pnode(0,0){C}{}@*)
+
+    time_t systime;(*@\pnode(0,0){D}{}@*)
+} sg_cpu_stats;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\begin{itemize}
+\onslide<2->{\item absolute ticks of measurable CPU states\rnode{a}{,}
+             \uncover<3->{\item context switches over all CPU's, also separated by voluntary and involuntary\rnode{b}{,}}
+             \uncover<4->{\item syscalls made, interrupts and soft-interrupts occured\rnode{c}{,}}
+             \uncover<5->{\item timestamp when collected this stats\rnode{d}{.}}
+             \uncover<2-5>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<3-5>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<4-5>{\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<5-5>{\nccurve[linecolor=olive]{->}{d}{D}}
+}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{CPU percents}
+\begin{block}<1->{sg\_cpu\_percents}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    double user(*@\pnode(0,0){A}{}@*);
+    double kernel(*@\pnode(0,0){B}{}@*);
+    double idle(*@\pnode(0,0){C}{}@*);
+    double iowait(*@\pnode(0,0){D}{}@*);
+    double swap(*@\pnode(0,0){E}{}@*);
+    double nice(*@\pnode(0,0){F}{}@*);
+    time_t time_taken(*@\pnode(0,0){G}{}@*);
+} sg_cpu_percents;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\begin{itemize}
+\onslide<2->{\item relative ticks of measurable CPU states:
+             \uncover<3->{ticks in \rnode{a}{user} mode,}
+             \uncover<4->{\rnode{b}{kernel} mode,}
+             \uncover<5->{\rnode{c}{idle} time,}
+             \uncover<6->{waiting for \rnode{d}{i/o},}
+             \uncover<7->{during page \rnode{e}{swap},}
+             \uncover<8->{\rnode{f}{nice} rescheduled}
+             \uncover<9->{\item timestamp when collected this stats\rnode{g}{.}}
+             \uncover<3-8>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<4-8>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<5-8>{\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<6-8>{\nccurve[linecolor=olive]{->}{d}{D}}
+             \uncover<7-8>{\nccurve[linecolor=olive]{->}{e}{E}}
+             \uncover<8-8>{\nccurve[linecolor=olive]{->}{f}{F}}
+             \uncover<9-9>{\nccurve[linecolor=olive]{->}{g}{G}}
+}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Load percents}
+\begin{block}<1->{sg\_load\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    double min1(*@\pnode(0,0){A}{}@*);
+    double min5(*@\pnode(0,0){B}{}@*);
+    double min15(*@\pnode(0,0){C}{}@*);
+    time_t systime(*@\pnode(0,0){D}{}@*);
+} sg_load_stats;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\begin{itemize}
+\onslide<2->{\item percentage of cpu usage per
+             \uncover<3->{\rnode{a}{1} minute,}
+             \uncover<4->{\rnode{b}{5} minutes and}
+             \uncover<5->{\rnode{c}{15} minutes.}
+             \uncover<6->{\item timestamp when collected this stats\rnode{d}{.}}
+             \uncover<3-5>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<4-5>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<5-5>{\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<6-6>{\nccurve[linecolor=olive]{->}{d}{D}}
+}
+\end{itemize}
+\end{frame}
+
+\section{Memory statistics}
+
+\begin{frame}[fragile]
+\frametitle{Memory stats}
+\begin{block}<1->{sg\_mem\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    unsigned long long total(*@\pnode(0,0){A}{}@*);
+    unsigned long long free(*@\pnode(0,0){B}{}@*);
+    unsigned long long used(*@\pnode(0,0){C}{}@*);
+    unsigned long long cache(*@\pnode(0,0){D}{}@*);
+    time_t systime(*@\pnode(0,0){E}{}@*);
+} sg_mem_stats;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\begin{itemize}
+\onslide<2->{\item information about main memory of the system:
+             \uncover<3->{\rnode{a}{total},}
+             \uncover<4->{\rnode{b}{free},}
+             \uncover<5->{\rnode{c}{used},}
+             \uncover<6->{\rnode{d}{cache},}
+             \uncover<7->{\item timestamp when collected this stats\rnode{e}{.}}
+             \uncover<3-6>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<4-6>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<5-6>{\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<6-6>{\nccurve[linecolor=olive]{->}{d}{D}}
+             \uncover<7-7>{\nccurve[linecolor=olive]{->}{e}{E}}
+}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Swap stats}
+\begin{block}<1->{sg\_swap\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    unsigned long long total(*@\pnode(0,0){A}{}@*);
+    unsigned long long free(*@\pnode(0,0){B}{}@*);
+    unsigned long long used(*@\pnode(0,0){C}{}@*);
+    time_t systime(*@\pnode(0,0){D}{}@*);
+} sg_swap_stats;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\begin{itemize}
+\onslide<2->{\item information about swap memory of the system:
+             \uncover<3->{\rnode{a}{total},}
+             \uncover<4->{\rnode{b}{free},}
+             \uncover<5->{\rnode{c}{used},}
+             \uncover<6->{\item timestamp when collected this stats\rnode{d}{.}}
+             \uncover<3-5>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<4-5>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<5-5>{\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<6-6>{\nccurve[linecolor=olive]{->}{d}{D}}
+}
+\end{itemize}
+\end{frame}
+
+\section{Disk / Storage statistics}
+
+\begin{frame}[fragile]
+\frametitle{Disk I/O stats}
+\begin{block}<1->{sg\_disk\_io\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    char *disk_name(*@\pnode(0,0){A}{}@*);
+    unsigned long long read_bytes(*@\pnode(0,0){B}{}@*);
+    unsigned long long write_bytes(*@\pnode(0,0){C}{}@*);
+    time_t systime(*@\pnode(0,0){D}{}@*);
+} sg_disk_io_stats;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\uncover<2->{for each block device known to the system}
+\begin{itemize}
+\onslide<2->{\item \rnode{a}{name} of the block device,
+             \uncover<3->{\item amount of bytes \rnode{b}{read}}
+             \uncover<4->{\item amount of bytes \rnode{c}{written}}
+             \uncover<5->{\item timestamp when collected this stats\rnode{d}{.}}
+             \uncover<2-2>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<3-4>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<4-4>{\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<5-5>{\nccurve[linecolor=olive]{->}{d}{D}}
+}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Paging stats}
+\begin{block}<1->{sg\_page\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    unsigned long long pages_pagein(*@\pnode(0,0){A}{}@*);
+    unsigned long long pages_pageout(*@\pnode(0,0){B}{}@*);
+    time_t systime(*@\pnode(0,0){C}{}@*);
+} sg_page_stats;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\uncover<2->{for entire system}
+\begin{itemize}
+\onslide<2->{\item amount of bytes \rnode{a}{paged in},
+             \uncover<3->{\item amount of bytes \rnode{b}{paged out}}
+             \uncover<4->{\item timestamp when collected this stats\rnode{c}{.}}
+             \uncover<2-3>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<3-3>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<4-4>{\nccurve[linecolor=olive]{->}{c}{C}}
+}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Filesystem stats}
+\begin{columns}[t]
+\begin{column}{.5\textwidth}
+\begin{block}<1->{sg\_fs\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    char *device_name(*@\pnode(0,0){A}{}@*);
+    char *fs_type(*@\pnode(0,0){B}{}@*);
+    char *mnt_point(*@\pnode(0,0){C}{}@*);
+    sg_fs_device_type device_type(*@\pnode(0,0){D}{}@*);
+    unsigned long long size(*@\pnode(0,0){E}{}@*);
+    unsigned long long used(*@\pnode(0,0){F}{}@*);
+    unsigned long long free(*@\pnode(0,0){G}{}@*);
+    unsigned long long avail(*@\pnode(0,0){H}{}@*);
+    unsigned long long total_inodes(*@\pnode(0,0){I}{}@*);
+    unsigned long long used_inodes(*@\pnode(0,0){J}{}@*);
+    unsigned long long free_inodes(*@\pnode(0,0){K}{}@*);
+    unsigned long long avail_inodes(*@\pnode(0,0){L}{}@*);
+    unsigned long long io_size(*@\pnode(0,0){M}{}@*);
+    unsigned long long block_size(*@\pnode(0,0){N}{}@*);
+    unsigned long long total_blocks(*@\pnode(0,0){O}{}@*);
+    unsigned long long free_blocks(*@\pnode(0,0){P}{}@*);
+    unsigned long long used_blocks(*@\pnode(0,0){Q}{}@*);
+    unsigned long long avail_blocks(*@\pnode(0,0){R}{}@*);
+    time_t systime(*@\pnode(0,0){S}{}@*);
+} sg_fs_stats;
+\end{lstlisting}
+\end{block}
+\end{column}
+
+\begin{column}{.5\textwidth}
+\scriptsize
+\uncover<2->{for each mounted (and not filtered) file system}
+\begin{itemize}
+\onslide<2->{\item \rnode{a}{name} of the mounted block device,
+             \uncover<3->{\item name of the \rnode{b}{file system} type (eg. ext3, ffs, zfs)}
+             \uncover<4->{\item full qualified path name of the \rnode{c}{mount point}}
+             \uncover<5->{\item \rnode{d}{device type}: one of \texttt{sg\_fs\_unknown}, \texttt{sg\_fs\_regular},
+			  \texttt{sg\_fs\_special}, \texttt{sg\_fs\_loopback}, \texttt{sg\_fs\_remote} or any
+			  combination\\
+			  Anything but unknown is covered by \texttt{sg\_fs\_alltypes}, any local type by
+			  \texttt{sg\_fs\_local}}
+             \uncover<6->{\item \rnode{e}{size} of the file system in bytes}
+             \uncover<7->{\item also separated into \rnode{f}{used}, \rnode{g}{free} and \rnode{h}{avail}}
+             \uncover<8->{\item \rnode{i}{inodes} of the file system}
+             \uncover<9->{\item also separated into \rnode{j}{used}, \rnode{k}{free} and \rnode{l}{avail}}
+             \uncover<10->{\item optimal \rnode{m}{size} of the I/O blocks when accessing the file system in bytes}
+             \uncover<11->{\item \rnode{n}{block size} (minimum allocation size) of the file system in bytes}
+             \uncover<12->{\item \rnode{o}{amount} of blocks of the file system}
+             \uncover<13->{\item also separated into \rnode{p}{used}, \rnode{q}{free} and \rnode{r}{avail}}
+             \uncover<14->{\item timestamp when collected this stats\rnode{s}{.}}
+             \uncover<2-4>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<3-4>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<4-4>{\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<5-5>{\nccurve[linecolor=olive]{->}{d}{D}}
+             \uncover<6-7>{\nccurve[linecolor=olive]{->}{e}{E}}
+             \uncover<7-7>{\nccurve[linecolor=olive]{->}{f}{F}}
+             \uncover<7-7>{\nccurve[linecolor=olive]{->}{g}{G}}
+             \uncover<7-7>{\nccurve[linecolor=olive]{->}{h}{H}}
+             \uncover<8-9>{\nccurve[linecolor=olive]{->}{i}{I}}
+             \uncover<9-9>{\nccurve[linecolor=olive]{->}{j}{J}}
+             \uncover<9-9>{\nccurve[linecolor=olive]{->}{k}{K}}
+             \uncover<9-9>{\nccurve[linecolor=olive]{->}{l}{L}}
+             \uncover<10-13>{\nccurve[linecolor=olive]{->}{m}{M}}
+             \uncover<11-13>{\nccurve[linecolor=olive]{->}{n}{N}}
+             \uncover<12-13>{\nccurve[linecolor=olive]{->}{o}{O}}
+             \uncover<13-13>{\nccurve[linecolor=olive]{->}{p}{P}}
+             \uncover<13-13>{\nccurve[linecolor=olive]{->}{q}{Q}}
+             \uncover<13-13>{\nccurve[linecolor=olive]{->}{r}{R}}
+             \uncover<14-14>{\nccurve[linecolor=olive]{->}{s}{S}}
+}
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+\section{User statistics}
+
+\begin{frame}[fragile]
+\frametitle{User stats}
+\begin{block}<1->{sg\_user\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    char *login_name(*@\pnode(0,0){A}{}@*);
+    char *record_id(*@\pnode(0,0){B}{}@*);
+    size_t record_id_size(*@\pnode(0,0){C}{}@*);
+    char *device(*@\pnode(0,0){D}{}@*);
+    char *hostname(*@\pnode(0,0){E}{}@*);
+    pid_t pid(*@\pnode(0,0){F}{}@*);
+    time_t login_time(*@\pnode(0,0){G}{}@*);
+    time_t systime(*@\pnode(0,0){H}{}@*);
+} sg_user_stats;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\uncover<2->{statistics about logged in users, as}
+\begin{itemize}
+\onslide<2->{\item \rnode{a}{login name},
+             \uncover<3->{\item \rnode{b}{record id} and \rnode{c}{size} of that field (not \texttt{'\textbackslash{}0'} terminated),}
+             \uncover<4->{\item \rnode{d}{device} where user logged in,}
+             \uncover<5->{\item \rnode{e}{hostname} when remote login}
+             \uncover<6->{\item \rnode{f}{process id} of the session's ''root'' process}
+             \uncover<7->{\item \rnode{g}{login time} of that session}
+             \uncover<8->{\item timestamp when collected this stats\rnode{h}{.}}
+             \uncover<2-2>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<3-4>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<3-4>{\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<4-5>{\nccurve[linecolor=olive]{->}{d}{D}}
+             \uncover<5-5>{\nccurve[linecolor=olive]{->}{e}{E}}
+             \uncover<6-6>{\nccurve[linecolor=olive]{->}{f}{F}}
+             \uncover<7-7>{\nccurve[linecolor=olive]{->}{g}{G}}
+             \uncover<8-8>{\nccurve[linecolor=olive]{->}{h}{H}}
+}
+\end{itemize}
+\end{frame}
+
+\section{Process statistics}
+
+\begin{frame}[fragile]
+\frametitle{Process stats}
+\begin{columns}[t]
+\begin{column}{.5\textwidth}
+\begin{block}<1->{sg\_process\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    char *process_name(*@\pnode(0,0){A}{}@*);
+    char *proctitle(*@\pnode(0,0){B}{}@*);
+    pid_t pid(*@\pnode(0,0){C}{}@*);
+    pid_t parent(*@\pnode(0,0){D}{}@*);
+    pid_t pgid(*@\pnode(0,0){E}{}@*);
+    pid_t sessid(*@\pnode(0,0){F}{}@*);
+    uid_t uid(*@\pnode(0,0){G}{}@*);
+    uid_t euid(*@\pnode(0,0){H}{}@*);
+    gid_t gid(*@\pnode(0,0){I}{}@*);
+    gid_t egid(*@\pnode(0,0){J}{}@*);
+    unsigned long long context_switches(*@\pnode(0,0){K}{}@*);
+    unsigned long long voluntary_context_switches(*@\pnode(0,0){L}{}@*);
+    unsigned long long involuntary_context_switches(*@\pnode(0,0){M}{}@*);
+    unsigned long long proc_size(*@\pnode(0,0){N}{}@*);
+    unsigned long long proc_resident(*@\pnode(0,0){O}{}@*);
+    time_t start_time(*@\pnode(0,0){P}{}@*);
+    time_t time_spent(*@\pnode(0,0){Q}{}@*);
+    double cpu_percent(*@\pnode(0,0){R}{}@*);
+    int nice(*@\pnode(0,0){S}{}@*);
+    sg_process_state state(*@\pnode(0,0){T}{}@*);
+    time_t systime(*@\pnode(0,0){U}{}@*);
+} sg_process_stats;
+\end{lstlisting}
+\end{block}
+\end{column}
+
+\begin{column}{.5\textwidth}
+\scriptsize
+\uncover<2->{for each existing process}
+\begin{itemize}
+\onslide<2->{\item name of the \rnode{a}{process image},
+             \uncover<3->{\item title of the \rnode{b}{process} (usually FQPN + args)}
+             \uncover<4->{\item process id of the \rnode{c}{process},}
+             \uncover<5->{the \rnode{d}{parent process},}
+             \uncover<6->{the \rnode{e}{process group leader} and}
+             \uncover<7->{the \rnode{f}{session id} of the session the process belongs to}
+             \uncover<8->{\item process' \rnode{g}{user id},}
+             \uncover<9->{\rnode{h}{group id},}
+             \uncover<10->{\rnode{i}{effective user id} and}
+             \uncover<11->{\rnode{j}{effective group id}}
+             \uncover<12->{\item \rnode{k}{context switches} done by the process, also separated by \rnode{l}{voluntary} and \rnode{m}{involuntary}}
+             \uncover<13->{\item \rnode{n}{virtual} memory size of the process, thereof \rnode{O}{resident}}
+             \uncover<14->{\item \rnode{p}{start time} of the process, \rnode{q}{time spent} on CPU during lifetime, \rnode{r}{relative} to system usage}
+             \uncover<15->{\item \rnode{s}{nice} value of the process (process scheduling increment)}
+             \uncover<16->{\item \rnode{t}{device type}: one of \texttt{SG\_PROCESS\_STATE\_RUNNING},
+			  \texttt{SG\_PROCESS\_STATE\_SLEEPING}, \texttt{SG\_PROCESS\_STATE\_STOPPED},
+			  \texttt{SG\_PROCESS\_STATE\_ZOMBIE} or \texttt{SG\_PROCESS\_STATE\_UNKNOWN}}
+             \uncover<17->{\item timestamp when collected this stats\rnode{u}{.}}
+             \uncover<2-3>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<3-3>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<4-7>{\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<5-7>{\nccurve[linecolor=olive]{->}{d}{D}}
+             \uncover<6-7>{\nccurve[linecolor=olive]{->}{e}{E}}
+             \uncover<7-7>{\nccurve[linecolor=olive]{->}{f}{F}}
+             \uncover<8-11>{\nccurve[linecolor=olive]{->}{g}{G}}
+             \uncover<9-11>{\nccurve[linecolor=olive]{->}{h}{H}}
+             \uncover<10-11>{\nccurve[linecolor=olive]{->}{i}{I}}
+             \uncover<11-11>{\nccurve[linecolor=olive]{->}{j}{J}}
+             \uncover<12-12>{\nccurve[linecolor=olive]{->}{k}{K}\nccurve[linecolor=olive]{->}{l}{L}\nccurve[linecolor=olive]{->}{m}{M}}
+             \uncover<13-13>{\nccurve[linecolor=olive]{->}{n}{N}\nccurve[linecolor=olive]{->}{o}{O}}
+             \uncover<14-14>{\nccurve[linecolor=olive]{->}{p}{P}\nccurve[linecolor=olive]{->}{q}{Q}\nccurve[linecolor=olive]{->}{r}{R}}
+             \uncover<15-15>{\nccurve[linecolor=olive]{->}{s}{S}}
+             \uncover<16-16>{\nccurve[linecolor=olive]{->}{t}{T}}
+             \uncover<17-17>{\nccurve[linecolor=olive]{->}{u}{U}}
+}
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+\section{Network statistics}
+
+\begin{frame}[fragile]
+\frametitle{Network I/O stats}
+\begin{block}<1->{sg\_network\_io\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    char *interface_name(*@\pnode(0,0){A}{}@*);
+    unsigned long long (*@\pnode(0,0){B}{}@*)tx;
+    unsigned long long rx(*@\pnode(0,0){C}{}@*);
+    unsigned long long (*@\pnode(0,0){D}{}@*)ipackets;
+    unsigned long long opackets(*@\pnode(0,0){E}{}@*);
+    unsigned long long (*@\pnode(0,0){F}{}@*)ierrors;
+    unsigned long long oerrors(*@\pnode(0,0){G}{}@*);
+    unsigned long long collisions(*@\pnode(0,0){H}{}@*);
+    time_t systime(*@\pnode(0,0){I}{}@*);
+} sg_network_io_stats;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\uncover<2->{for each network interface}
+\begin{itemize}
+\onslide<2->{\item \rnode{a}{interface name} (eg. ''em0'', ''fxp0'', ''en0'', ''eth0'' \ldots),
+             \uncover<3->{\item bytes \rnode{b}{transmitted} and \rnode{c}{received}}
+             \uncover<4->{\item packets \rnode{d}{transmitted} and \rnode{e}{received}}
+             \uncover<5->{\item errors \rnode{f}{transmitting} and \rnode{g}{receiving} packets}
+             \uncover<6->{\item detected \rnode{h}{collisions}}
+             \uncover<7->{\item timestamp when collected this stats\rnode{i}{.}}
+             \uncover<2-2>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<3-3>{\nccurve[linecolor=olive]{->}{b}{B}\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<4-4>{\nccurve[linecolor=olive]{->}{d}{D}\nccurve[linecolor=olive]{->}{e}{E}}
+             \uncover<5-6>{\nccurve[linecolor=olive]{->}{f}{F}\nccurve[linecolor=olive]{->}{g}{G}}
+             \uncover<6-6>{\nccurve[linecolor=olive]{->}{h}{H}}
+             \uncover<7-7>{\nccurve[linecolor=olive]{->}{i}{I}}
+}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Network Interface stats}
+\begin{block}<1->{sg\_network\_iface\_stats}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct {
+    char *interface_name(*@\pnode(0,0){A}{}@*);
+    unsigned long long speed(*@\pnode(0,0){B}{}@*);
+    unsigned long long factor(*@\pnode(0,0){C}{}@*);
+    sg_iface_duplex duplex(*@\pnode(0,0){D}{}@*);
+    sg_iface_updown up(*@\pnode(0,0){E}{}@*);
+    time_t systime(*@\pnode(0,0){F}{}@*);
+} sg_network_iface_stats;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\uncover<2->{for each network interface}
+\begin{itemize}
+\onslide<2->{\item \rnode{a}{interface name} (eg. ''em0'', ''fxp0'', ''en0'', ''eth0'' \ldots),
+             \uncover<3->{\item capable to transfer \rnode{b}{times} of \rnode{c}{sized} units per second}
+             \uncover<4->{\item capable to transmit and receive \rnode{d}{simultanously} (\texttt{SG\_IFACE\_DUPLEX\_FULL}, \texttt{SG\_IFACE\_DUPLEX\_HALF} or \texttt{SG\_IFACE\_DUPLEX\_UNKNOWN})}
+             \uncover<5->{\item NIC is \rnode{e}{\texttt{SG\_IFACE\_UP} or \texttt{SG\_IFACE\_DOWN}}}
+             \uncover<6->{\item timestamp when collected this stats\rnode{f}{.}}
+             \uncover<2-2>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<3-3>{\nccurve[linecolor=olive]{->}{b}{B}\nccurve[linecolor=olive]{->}{c}{C}}
+             \uncover<4-4>{\nccurve[linecolor=olive]{->}{d}{D}}
+             \uncover<5-5>{\nccurve[linecolor=olive]{->}{e}{E}}
+             \uncover<6-6>{\nccurve[linecolor=olive]{->}{f}{F}}
+}
+\end{itemize}
+\end{frame}
+
+\section{Error management}
+
+\begin{frame}[fragile]
+\frametitle{Error information}
+\begin{block}<1->{sg\_error\_details}
+\tiny
+\begin{lstlisting}[language=C++,inputencoding=latin9,escapeinside={(*@}{@*)}]
+typedef struct sg_error_details {
+	sg_error error(*@\pnode(0,0){A}{}@*);
+	int errno_value(*@\pnode(0,0){B}{}@*);
+	const char *error_arg(*@\pnode(0,0){C}{}@*);
+} sg_error_details;
+\end{lstlisting}
+\end{block}
+
+\scriptsize
+\uncover<2->{when an error occured (no stats are resulted upon querying):}
+\begin{itemize}
+\onslide<2->{\item libstatgrab \rnode{a}{error code} (eg. \texttt{SG\_ERROR\_INVALID\_ARGUMENT})
+             \uncover<3->{\item system (errno.h) \rnode{b}{error code} (eg. \texttt{EBUSY}}
+             \uncover<4->{\item optional error \rnode{c}{explanation} message (eg. file name, process id, \ldots)}
+             \uncover<2-2>{\nccurve[linecolor=olive]{->}{a}{A}}
+             \uncover<3-3>{\nccurve[linecolor=olive]{->}{b}{B}}
+             \uncover<4-4>{\nccurve[linecolor=olive]{->}{c}{C}}
+}
+\end{itemize}
+\end{frame}
+
+\part{Unix::Statgrab}
+
+\section{Entry Functions}
+
+\begin{frame}[fragile]
+\frametitle{Entry Functions}
+\begin{block}<1->{}
+\tiny
+\begin{lstlisting}[language=Perl,inputencoding=latin9,escapeinside={(*@}{@*)}]
+get_error(); # return details about last error
+get_host_info(); # returns sg_host_info
+get_cpu_stats(); # returns sg_cpu_stats
+get_disk_io_stats(); # returns sg_disk_io_stats
+get_fs_stats(); # returns sg_fs_stats
+get_load_stats(); # returns sg_load_stats
+get_mem_stats(); # returns sg_mem_stats
+get_swap_stats(); # returns sg_swap_stats
+get_network_io_stats(); # returns sg_network_io_stats
+get_network_iface_stats(); # returns sg_network_iface_stats
+get_page_stats(); # returns sg_page_stats
+get_user_stats(); # returns sg_user_stats
+get_process_stats(); # returns sg_process_stats
+\end{lstlisting}
+\end{block}
+\end{frame}
+
+\section{SYNOPSIS}
+
+\begin{frame}[fragile]
+\frametitle{Common \ldots}
+\begin{block}<1->{Common \ldots}
+\tiny
+\begin{lstlisting}[language=Perl,inputencoding=latin9,escapeinside={(*@}{@*)}]
+use Unix::Statgrab;
+
+my $host_info = get_host_info() or croak( get_error()->strperror() );
+printf( "%d\n", $host_info->entries() );
+my $cpu_stats = get_cpu_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $cpu_stats->entries() );
+my $disk_io_stats = get_disk_io_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $disk_io_stats->entries() );
+my $fs_stats = get_fs_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $fs_stats->entries() );
+my $load_stats = get_load_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $load_stats->entries() );
+my $mem_stats = get_mem_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $mem_stats->entries() );
+my $swap_stats = get_swap_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $swap_stats->entries() );
+my $net_io_stats = get_network_io_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $net_io_stats->entries() );
+my $net_iface_stats = get_network_iface_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $net_iface_stats->entries() );
+my $paging_stats = get_page_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $paging->entries() );
+my $user_stats = get_user_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $user_stats->entries() );
+my $proc_stats = get_process_stats() or croak( get_error()->strperror() );
+printf( "%d\n", $proc_stats->entries() );
+\end{lstlisting}
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{SYNOPSIS}
+\begin{block}<1->{SYNOPSIS}
+\tiny
+\begin{lstlisting}[language=Perl,inputencoding=latin9,escapeinside={(*@}{@*)}]
+use Unix::Statgrab;
+
+my $host_stats = get_host_info();
+print $host_stats->hostname . " is a " . $host_stats->bitwidth . " " . $host_stats->os_name . "\n";
+
+my $filesystems = get_fs_stats();
+my @mount_points = map { $filesystems->mnt_point($_) } (0 .. $filesystems->entries() - 1);
+print $host_stats->hostname . " has " . join( ", ", @mount_points ) . " mounted\n";
+
+my $proc_list = get_process_stats();
+my @proc_by_type;
+foreach my $proc_entry (0 .. $proc_list->entries() - 1) {
+    $proc_by_type[$proc_list->state($proc_entry)]++;
+}
+my $total_procs = 0;
+$total_procs += $_ for grep { defined $_ } @proc_by_type;
+foreach my $state (qw(SG_PROCESS_STATE_RUNNING SG_PROCESS_STATE_SLEEPING
+                      SG_PROCESS_STATE_STOPPED SG_PROCESS_STATE_ZOMBIE
+		      		      SG_PROCESS_STATE_UNKNOWN)) {
+    defined $proc_by_type[Unix::Statgrab->$state] or next;
+    print $proc_by_type[Unix::Statgrab->$state] . " of " . $total_procs . " procs in $state\n";
+}
+\end{lstlisting}
+\end{block}
+\end{frame}
+
+% SYNOPSIS diff / percent
+\begin{frame}[fragile]
+\frametitle{SYNOPSIS II}
+\begin{block}<1->{SYNOPSIS diff / percent}
+\tiny
+\begin{lstlisting}[language=Perl,inputencoding=latin9,escapeinside={(*@}{@*)}]
+use Unix::Statgrab;
+
+my $last_cpu_stats = get_cpu_stats() or croak( get_error()->strperror() );
+do_sth_way_longer();
+my $cpu_diff = get_cpu_stats()->get_cpu_stats_diff($last_cpu_stats);
+
+my $last_cpu_percent = $last_cpu_percent->get_cpu_percents();
+my $diff_cpu_percent = $cpu_diff->get_cpu_percents();
+my $now_cpu_percent = get_cpu_stats()->get_cpu_percents();
+
+my $last_disk_io_stats = get_disk_io_stats() or croak( get_error()->strperror() );
+do_sth_way_longer();
+my $disk_io_diff = get_disk_io_stats()->get_disk_io_stats_diff($last_disk_io_stats);
+
+my $last_fs_stats = get_fs_stats() or croak( get_error()->strperror() );
+do_sth_way_longer();
+my $fs_diff = get_fs_stats()->get_fs_stats_diff($last_fs_stats);
+
+my $last_net_io_stats = get_network_io_stats() or croak( get_error()->strperror() );
+do_sth_way_longer();
+my $net_io_diff = get_network_io_stats()->get_network_io_stats_diff($last_net_io_stats);
+
+my $last_paging_stats = get_page_stats() or croak( get_error()->strperror() );
+do_sth_way_longer();
+my $paging_diff = get_page_stats()->get_page_stats_diff($last_paging_stats);
+\end{lstlisting}
+\end{block}
+\end{frame}
+
+
+% RESOURCES
+\begin{frame}[fragile]
+\frametitle{Resources}
+\begin{block}<1->{Software}
+\url{http://www.i-scream.org/libstatgrab/} \\
+\url{http://search.cpan.org/dist/Unix-Statgrab/} \\
+\url{https://metacpan.org/module/Unix::Statgrab}
+\end{block}
+
+\begin{block}<2->{Mailing List}
+\url{https://lists.i-scream.org/pipermail/users/} \\
+\url{users@i-scream.org}
+\end{block}
+
+\begin{block}<3->{IRC}
+\url{irc://irc.freenode.net/#libstatgrab}
+\end{block}
+\end{frame}
+
+% THANKS
+\begin{frame}[fragile]
+\frametitle{Thank You}
+\begin{block}<1->{Thank you}
+\begin{itemize}
+\uncover<2->{\item Tim Bishop for caring for high quality release}
+\uncover<3->{\item H. Merijn Brand for doing additional tests on more exotic platforms}
+\uncover<4->{\item Reini Urban for proving on commodity hardware for being sane}
+\end{itemize}
+\end{block}
+\begin{block}<5->{Questions?}
+Jens Rehsack \textless{}\href{mailto:rehsack@cpan.org}{rehsack@cpan.org}\textgreater{}
+\end{block}
+\end{frame}
+
+%\begin{frame}[fragile]
+%\frametitle{}
+%\begin{block}<1->{}
+%\begin{itemize}
+%\item 
+%\end{itemize}
+%\end{block}
+%\end{frame}
+
+\end{document}
